@@ -1,8 +1,10 @@
 package httpd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
+	"plants/plants"
 )
 
 // ListPlants godoc
@@ -18,15 +20,17 @@ import (
 //	@Failure		500	{object}	httpError
 //	@Router			/plants [get]
 func (s *httpService) handleListPlants(w http.ResponseWriter, r *http.Request) {
-	plants, err := s.store.List()
+	plts, err := s.store.List()
 	if err != nil {
-		errorMsg := fmt.Errorf("retrieve all plants: %w", err)
-		s.logger.Error(errorMsg.Error())
-		s.response(w, http.StatusInternalServerError, newHttpError(errorMsg))
+		s.responseError(w, http.StatusInternalServerError, fmt.Errorf("retrieve all plants: %w", err))
 		return
 	}
 
-	s.response(w, http.StatusOK, plants)
+	if len(plts) == 0 {
+		plts = make([]plants.Plant, 0)
+	}
+
+	s.response(w, http.StatusOK, plts)
 }
 
 // GetPlant godoc
@@ -43,12 +47,19 @@ func (s *httpService) handleListPlants(w http.ResponseWriter, r *http.Request) {
 //	@Router			/plants/{id} [get]
 func (s *httpService) handleGetPlant(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if id == "" {
+		s.responseError(w, http.StatusUnprocessableEntity, errors.New("id is required in path parameters"))
+		return
+	}
+
 	plant, err := s.store.Find(id)
 	if err != nil {
-		errorMsg := fmt.Errorf("find plant by id: %w", err)
-		s.logger.Error(errorMsg.Error())
-		// NOTE: if store has typed errors, we can change http response codes here
-		s.response(w, http.StatusInternalServerError, newHttpError(errorMsg))
+		s.responseError(w, http.StatusInternalServerError, fmt.Errorf("find plant by id: %w", err))
+		return
+	}
+
+	if plant == nil {
+		s.responseError(w, http.StatusNotFound, fmt.Errorf("plant with ID '%s' does not exist", id))
 		return
 	}
 

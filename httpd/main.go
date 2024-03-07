@@ -3,6 +3,7 @@ package httpd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -38,11 +39,7 @@ func Run() {
 	s := store.NewMemoryStore([]plants.Plant{})
 	logger := slog.Default()
 
-	service := httpService{
-		store:  s,
-		logger: logger,
-	}
-
+	service := newHttpService(s, logger)
 	host := "localhost:8080"
 
 	root := "/api/v1"
@@ -67,6 +64,20 @@ func Run() {
 	http.ListenAndServe(host, chain)
 }
 
+// newHttpService - initializes a new httpService with its dependencies.
+// Passing nil as logger discards all logging messages (used for testing)
+func newHttpService(store store.Store, logger *slog.Logger) *httpService {
+	if logger == nil {
+		noopHandler := slog.NewJSONHandler(io.Discard, nil)
+		logger = slog.New(noopHandler)
+	}
+
+	return &httpService{
+		store:  store,
+		logger: logger,
+	}
+}
+
 type httpService struct {
 	store  store.Store
 	logger *slog.Logger
@@ -75,9 +86,17 @@ type httpService struct {
 func (s *httpService) response(w http.ResponseWriter, code int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
+	responseBytes, err := json.Marshal(payload)
+	if err != nil {
 		s.logger.Error(fmt.Errorf("marshal response payload: %w", err).Error())
 	}
+	w.Write(responseBytes)
+}
+
+func (s *httpService) responseError(w http.ResponseWriter, code int, err error) {
+	s.logger.Error(err.Error())
+	s.response(w, code, newHttpError(err))
+
 }
 
 func logRequestsMiddleware(next http.Handler) http.Handler {

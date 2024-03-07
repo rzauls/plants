@@ -39,12 +39,12 @@ func TestMemoryStoreList(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			got, gotErr := tc.store.List()
 			if gotErr != nil && tc.wantErr != nil {
-				// there is nothing to test here, since MemotyStore cant fail the List method
+				t.Fatalf("unexpected branch, no errors should occur in this test: %v", gotErr)
 			}
 
 			if len(tc.want) > 0 || len(got) > 0 {
 				if !reflect.DeepEqual(tc.want, got) {
-					t.Fatalf("expected: %v, got: %v", tc.want, got)
+					t.Errorf("expected: %v, got: %v", tc.want, got)
 				}
 			}
 		})
@@ -86,11 +86,11 @@ func TestMemoryStoreFind(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			got, gotErr := tc.store.Find(tc.id)
 			if gotErr != nil && !tc.wantErr {
-				t.Fatalf("got error when didnt expect one: %v", gotErr)
+				t.Errorf("got error when didnt expect one: %v", gotErr)
 			}
 
 			if !reflect.DeepEqual(tc.want, got) {
-				t.Fatalf("expected: %v, got: %v", tc.want, got)
+				t.Errorf("expected: %v, got: %v", tc.want, got)
 			}
 		})
 	}
