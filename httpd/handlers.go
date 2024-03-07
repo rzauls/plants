@@ -3,65 +3,77 @@ package httpd
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"plants/plants"
+	"plants/store"
 )
 
-// ListPlants godoc
-//
-//	@Summary		List all plants
-//	@Description	Get all plants
-//	@Tags			plants
-//	@Accept			json
-//	@Produce		json
-//	@Success		200	{array}		plants.Plant
-//	@Failure		400	{object}	httpError
-//	@Failure		404	{object}	httpError
-//	@Failure		500	{object}	httpError
-//	@Router			/plants [get]
-func (s *httpService) handleListPlants(w http.ResponseWriter, r *http.Request) {
-	plts, err := s.store.List()
-	if err != nil {
-		s.responseError(w, http.StatusInternalServerError, fmt.Errorf("retrieve all plants: %w", err))
-		return
-	}
+func handleListPlants(logger *slog.Logger, plantStore store.Store) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		plts, err := plantStore.List()
+		if err != nil {
+			err = fmt.Errorf("retrieve all plants: %w", err)
+			logger.Error(err.Error())
+			encode(w, r, http.StatusInternalServerError, newHttpError(err))
+			return
+		}
 
-	if len(plts) == 0 {
-		plts = make([]plants.Plant, 0)
-	}
+		if len(plts) == 0 {
+			plts = make([]plants.Plant, 0)
+		}
 
-	s.response(w, http.StatusOK, plts)
+		encode(w, r, http.StatusOK, plts)
+	})
 }
 
-// GetPlant godoc
-//
-//	@Summary		Get plant
-//	@Description	Get plant by id
-//	@Tags			plants
-//	@Accept			json
-//	@Produce		json
-//	@Success		200	{object}	plants.Plant
-//	@Failure		400	{object}	httpError
-//	@Failure		404	{object}	httpError
-//	@Failure		500	{object}	httpError
-//	@Router			/plants/{id} [get]
-func (s *httpService) handleGetPlant(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if id == "" {
-		s.responseError(w, http.StatusUnprocessableEntity, errors.New("id is required in path parameters"))
-		return
-	}
+func handleGetPlant(logger *slog.Logger, plantStore store.Store) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		if id == "" {
+			err := errors.New("id is required in path parameters")
+			logger.Error(err.Error())
+			encode(w, r, http.StatusUnprocessableEntity, newHttpError(err))
+			return
+		}
 
-	plant, err := s.store.Find(id)
-	if err != nil {
-		s.responseError(w, http.StatusInternalServerError, fmt.Errorf("find plant by id: %w", err))
-		return
-	}
+		plant, err := plantStore.Find(id)
+		if err != nil {
+			err = fmt.Errorf("find plant by id: %w", err)
+			logger.Error(err.Error())
+			encode(w, r, http.StatusInternalServerError, newHttpError(err))
+			return
+		}
 
-	if plant == nil {
-		s.responseError(w, http.StatusNotFound, fmt.Errorf("plant with ID '%s' does not exist", id))
-		return
-	}
+		if plant == nil {
+			err = fmt.Errorf("plant with ID '%s' does not exist", id)
+			logger.Error(err.Error())
+			encode(w, r, http.StatusNotFound, newHttpError(err))
+			return
+		}
 
-	s.response(w, http.StatusOK, plant)
+		encode(w, r, http.StatusOK, plant)
+	})
+}
+
+func handleCreatePlant(logger *slog.Logger, plantStore store.Store) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		newPlant, problems, err := decodeValid[plants.Plant](r)
+		if err != nil {
+			err = fmt.Errorf("validation error: %w", err)
+			logger.Error(err.Error())
+			encode(w, r, http.StatusUnprocessableEntity, newValidationError(err.Error(), problems))
+			return
+		}
+
+		plant, err := plantStore.Create(newPlant)
+		if err != nil {
+			err = fmt.Errorf("create plant: %w", err)
+			logger.Error(err.Error())
+			encode(w, r, http.StatusInternalServerError, newHttpError(err))
+			return
+		}
+
+		encode(w, r, http.StatusOK, plant)
+	})
 }

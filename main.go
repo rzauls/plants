@@ -1,23 +1,33 @@
 package main
 
 import (
-	"log"
+	"context"
+	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"plants/httpd"
 )
 
-// basic http api to test swagger annotations
-func main() {
-	// handle exit signals
-	go func() {
-		sigchan := make(chan os.Signal, 1)
-		signal.Notify(sigchan, os.Interrupt)
-		<-sigchan
-		log.Println("Program terminated by OS signal")
-		// TODO: any additional things to do before exiting
-		os.Exit(0)
-	}()
+// run - starts the http daemon with a cancellable context
+// run is just a wrapper so we can always return errors
+// its also useful for testing the service
+func run(
+	ctx context.Context,
+	args []string,
+	getenv func(string) string,
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+) error {
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
+	defer cancel()
+	return httpd.Run(ctx)
+}
 
-	httpd.Run()
+func main() {
+	ctx := context.Background()
+	if err := run(ctx, os.Args, os.Getenv, os.Stdin, os.Stdout, os.Stderr); err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err)
+		os.Exit(1)
+	}
 }

@@ -1,15 +1,15 @@
 package httpd
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"plants/plants"
 	"plants/store"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestListPlants(t *testing.T) {
@@ -67,9 +67,8 @@ func TestListPlants(t *testing.T) {
 			if gotErr != nil {
 				t.Errorf("failed to read response body: %v", gotErr)
 			}
-			if string(gotBody) != tc.wantResponse {
-				t.Errorf(gotWantJson(string(gotBody), tc.wantResponse))
-			}
+
+			assert.JSONEq(t, tc.wantResponse, string(gotBody))
 		})
 	}
 }
@@ -139,12 +138,13 @@ func TestGetPlantByID(t *testing.T) {
 			if gotErr != nil {
 				t.Errorf("failed to read response body: %v", gotErr)
 			}
-			if string(gotBody) != tc.wantResponse {
-				t.Errorf(gotWantJson(string(gotBody), tc.wantResponse))
-			}
+
+			assert.JSONEq(t, tc.wantResponse, string(gotBody))
 		})
 	}
 }
+
+// TODO: write tests for create handler
 
 type mockStore struct {
 	plants []plants.Plant
@@ -169,11 +169,7 @@ func (s *mockStore) Find(id string) (*plants.Plant, error) {
 	return s.plant, nil
 }
 
-// gotWantJson - formats json strings into somewhat more human-comparable look
-func gotWantJson(got any, want any) string {
-	spacing := "  "
-	gotJson, _ := json.MarshalIndent(got, "", spacing)
-	wantJson, _ := json.MarshalIndent(want, "", spacing)
-
-	return fmt.Sprintf("\ngot:\n%s\nwant:\n%s", string(gotJson), string(wantJson))
+func (s *mockStore) Create(plant plants.Plant) (*plants.Plant, error) {
+	plant.ID = "new id"
+	return &plant, nil
 }
