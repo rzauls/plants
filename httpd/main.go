@@ -53,7 +53,7 @@ func Run(
 
 	go func() {
 		logger.Info(fmt.Sprintf("listening to requests on %s", string(httpServer.Addr)))
-		if err := httpServer.ListenAndServe(); err != nil {
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error(fmt.Sprintf("error listening: %s", err))
 			return
 		}
