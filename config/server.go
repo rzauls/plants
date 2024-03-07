@@ -2,12 +2,12 @@ package config
 
 type Server struct {
 	Host string
-	Port int
+	Port string
 }
 
 func NewDefaultServer() Server {
 	return Server{
 		Host: "localhost",
-		Port: 8080,
+		Port: "8080",
 	}
 }

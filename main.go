@@ -19,13 +19,25 @@ func run(
 	stdin io.Reader,
 	stdout, stderr io.Writer,
 ) error {
-	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
-	defer cancel()
-	return httpd.Run(ctx)
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		sigchan := make(chan os.Signal, 1)
+		signal.Notify(sigchan, os.Interrupt)
+		<-sigchan
+		cancel()
+		os.Exit(0)
+	}()
+
+	if err := httpd.Run(ctx, args, getenv, stdin, stdout, stderr); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func main() {
 	ctx := context.Background()
+	// NOTE: in main() we use all the os defaults
 	if err := run(ctx, os.Args, os.Getenv, os.Stdin, os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)

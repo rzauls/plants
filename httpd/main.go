@@ -4,15 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"plants/config"
 	"plants/plants"
 	"plants/store"
-	"sync"
-	"time"
 )
 
 func NewServer(logger *slog.Logger, plantStore store.Store) http.Handler {
@@ -28,41 +26,43 @@ func NewServer(logger *slog.Logger, plantStore store.Store) http.Handler {
 	return handler
 }
 
-func Run(ctx context.Context) error {
-	logger := slog.Default()
+func Run(
+	ctx context.Context,
+	args []string,
+	getenv func(string) string,
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+) error {
+	logger := slog.New(slog.NewJSONHandler(stdout, nil))
+	slog.SetDefault(logger)
+
 	// NOTE: realistically this wouldnt be an in-memory array,
 	// but a DB implementation of store.Store interface
 	s := store.NewMemoryStore([]plants.Plant{})
 	srv := NewServer(logger, s)
 
 	cfg := config.NewDefaultServer()
+	// you could get some env vars here using `getenv`
+	// cfg.HOST = getenv("API_HOST")
+	// or parse args
+
 	httpServer := &http.Server{
-		Addr:    net.JoinHostPort(cfg.Host, string(cfg.Port)),
+		Addr:    net.JoinHostPort(cfg.Host, cfg.Port),
 		Handler: srv,
 	}
 
 	go func() {
-		logger.Info(fmt.Sprintf("listening to requests on %s\n", httpServer.Addr))
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Fprintf(os.Stderr, "error listening and serving: %s\n", err)
+		<-ctx.Done()
+		if err := httpServer.Shutdown(ctx); err != nil {
+			logger.Error(fmt.Sprintf("error shutting down: %s", err))
 		}
 	}()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		ctx.Done()
-		// TODO: figure out if this is broken
-		shutdownCtx := context.Background()
-		// allow 10 seconds to shut down gracefully
-		shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			fmt.Fprintf(os.Stderr, "error shutting down http server: %s\n", err)
-		}
-	}()
-	wg.Wait()
+	logger.Info(fmt.Sprintf("listening to requests on %s", string(httpServer.Addr)))
+	if err := httpServer.ListenAndServe(); err != nil {
+		logger.Error(fmt.Sprintf("error listening: %s", err))
+		return err
+	}
 
 	return nil
 }
