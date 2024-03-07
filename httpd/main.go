@@ -13,21 +13,23 @@ import (
 	"plants/store"
 )
 
-// @title           Swagger Plant API
-// @version         1.0
-// @description     This is a sample server plant server with semi-auto generated swagger docs
+//	@title			Swagger Plant API
+//	@version		1.0
+//	@description	This is a sample server plant server with semi-auto generated swagger docs
 
-// @contact.name   Rihards Zauls
-// @contact.email  rihards.zauls@gmail.com
+//	@contact.name	Rihards Zauls
+//	@contact.email	rihards.zauls@gmail.com
 
-// @license.name  Apache 2.0
-// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
+//	@license.name	Apache 2.0
+//	@license.url	http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @host      localhost:8080
-// @BasePath  /api/v1
+//	@host		localhost:8080
+//	@BasePath	/api/v1
 
-// @externalDocs.description  OpenAPI
-// @externalDocs.url          https://swagger.io/resources/open-api/
+//	@externalDocs.description	OpenAPI
+//	@externalDocs.url			https://swagger.io/resources/open-api/
+//
+// Run - runs the http daemon
 func Run() {
 	// NOTE: realistically this wouldnt be an in-memory array,
 	// but a DB implementation of store.Store interface
@@ -42,6 +44,8 @@ func Run() {
 	}
 
 	host := "localhost:8080"
+
+	root := "/api/v1"
 	mux := http.NewServeMux()
 	// mux.handleFunc("/docs/swagger.json",
 	// http.Handle("/",
@@ -49,12 +53,12 @@ func Run() {
 	//     http.File("../docs/swagger.json"),
 	// )
 	// )
-	mux.HandleFunc("/docs/*", httpSwagger.Handler(
+	mux.HandleFunc(http.MethodGet+" "+root+"/docs/*", httpSwagger.Handler(
 		httpSwagger.URL(host+"/docs/swagger.json"),
 	),
 	)
-	mux.HandleFunc(http.MethodGet+" /plants/", service.handleListPlants)
-	mux.HandleFunc(http.MethodGet+" /plants/{id}/", service.handleGetPlant)
+	mux.HandleFunc(http.MethodGet+" "+root+"/plants/", service.handleListPlants)
+	mux.HandleFunc(http.MethodGet+" "+root+"/plants/{id}/", service.handleGetPlant)
 
 	logger.Info(fmt.Sprintf("Listening to requests on %s\n", host))
 
