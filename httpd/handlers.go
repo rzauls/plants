@@ -3,7 +3,6 @@ package httpd
 import (
 	"fmt"
 	"net/http"
-    "plants/plants"
 )
 
 // ListPlants godoc
@@ -17,11 +16,16 @@ import (
 // @Failure      404  {object}  httpError
 // @Failure      500  {object}  httpError
 // @Router       /plants [get]
-func handleListPlants(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "got all plants\n")
-    all := []plants.Plant{}
-    fmt.Printf("plants: %v", all)
+func (s *httpService) handleListPlants(w http.ResponseWriter, r *http.Request) {
+	plants, err := s.store.List()
+	if err != nil {
+		errorMsg := fmt.Errorf("retrieve all plants: %w", err)
+		s.logger.Error(errorMsg.Error())
+		s.response(w, http.StatusInternalServerError, newHttpError(errorMsg))
+		return
+	}
 
+	s.response(w, http.StatusOK, plants)
 }
 
 // GetPlant godoc
@@ -35,7 +39,16 @@ func handleListPlants(w http.ResponseWriter, r *http.Request) {
 // @Failure      404  {object}  httpError
 // @Failure      500  {object}  httpError
 // @Router       /plants/{id} [get]
-func handleGetPlant(w http.ResponseWriter, r *http.Request) {
+func (s *httpService) handleGetPlant(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	fmt.Fprintf(w, "got plant with id=%v\n", id)
+	plant, err := s.store.Find(id)
+	if err != nil {
+		errorMsg := fmt.Errorf("find plant by id: %w", err)
+		s.logger.Error(errorMsg.Error())
+		// NOTE: if store has typed errors, we can change http response codes here
+		s.response(w, http.StatusInternalServerError, newHttpError(errorMsg))
+		return
+	}
+
+	s.response(w, http.StatusOK, plant)
 }

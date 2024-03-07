@@ -1,9 +1,6 @@
-basePath: /api/v1
 definitions:
   httpd.httpError:
     properties:
-      code:
-        type: string
       message:
         type: string
     type: object
@@ -11,24 +8,13 @@ definitions:
     properties:
       height:
         type: integer
+      id:
+        type: string
       name:
         type: string
     type: object
-externalDocs:
-  description: OpenAPI
-  url: https://swagger.io/resources/open-api/
-host: localhost:8080
 info:
-  contact:
-    email: rihards.zauls@gmail.com
-    name: Rihards Zauls
-  description: This is a sample server plant server with semi-auto generated swagger
-    docs
-  license:
-    name: Apache 2.0
-    url: http://www.apache.org/licenses/LICENSE-2.0.html
-  title: Swagger Plant API
-  version: "1.0"
+  contact: {}
 paths:
   /plants:
     get:

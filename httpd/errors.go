@@ -1,6 +1,11 @@
 package httpd
 
 type httpError struct {
-    Code string `json:"code"`
-    Message string `json:"message"`
+	Message string `json:"message"`
+}
+
+func newHttpError(err error) httpError {
+	return httpError{
+		Message: err.Error(),
+	}
 }
