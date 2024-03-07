@@ -52,16 +52,17 @@ func Run(
 	}
 
 	go func() {
-		<-ctx.Done()
-		if err := httpServer.Shutdown(ctx); err != nil {
-			logger.Error(fmt.Sprintf("error shutting down: %s", err))
+		logger.Info(fmt.Sprintf("listening to requests on %s", string(httpServer.Addr)))
+		if err := httpServer.ListenAndServe(); err != nil {
+			logger.Error(fmt.Sprintf("error listening: %s", err))
+			return
 		}
 	}()
 
-	logger.Info(fmt.Sprintf("listening to requests on %s", string(httpServer.Addr)))
-	if err := httpServer.ListenAndServe(); err != nil {
-		logger.Error(fmt.Sprintf("error listening: %s", err))
-		return err
+	<-ctx.Done()
+	logger.Info("graceful shutdown")
+	if err := httpServer.Shutdown(ctx); err != nil {
+		logger.Error(fmt.Sprintf("error shutting down: %s", err))
 	}
 
 	return nil

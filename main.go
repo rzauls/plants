@@ -19,14 +19,8 @@ func run(
 	stdin io.Reader,
 	stdout, stderr io.Writer,
 ) error {
-	ctx, cancel := context.WithCancel(ctx)
-	go func() {
-		sigchan := make(chan os.Signal, 1)
-		signal.Notify(sigchan, os.Interrupt)
-		<-sigchan
-		cancel()
-		os.Exit(0)
-	}()
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, os.Kill)
+	defer cancel()
 
 	if err := httpd.Run(ctx, args, getenv, stdin, stdout, stderr); err != nil {
 		return err
