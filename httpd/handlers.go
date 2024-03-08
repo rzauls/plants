@@ -9,6 +9,13 @@ import (
 	"plants/store"
 )
 
+func handleHealth(logger *slog.Logger) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// TODO: check if all dependencies are accessible and ready for connections
+		encode(w, r, http.StatusOK, "ok")
+	})
+}
+
 func handleListPlants(logger *slog.Logger, plantStore store.Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		plts, err := plantStore.List()

@@ -13,9 +13,9 @@ import (
 	"plants/store"
 )
 
-func NewServer(logger *slog.Logger, plantStore store.Store) http.Handler {
+func NewServer(logger *slog.Logger, config config.Server, plantStore store.Store) http.Handler {
 	mux := http.NewServeMux()
-	addRoutes(mux, logger, plantStore)
+	addRoutes(mux, config, logger, plantStore)
 	// NOTE: handler doesnt care about what mux we use, so we define it as interface
 	var handler http.Handler = mux
 
@@ -36,19 +36,19 @@ func Run(
 	logger := slog.New(slog.NewJSONHandler(stdout, nil))
 	slog.SetDefault(logger)
 
-	// NOTE: realistically this wouldnt be an in-memory array,
-	// but a DB implementation of store.Store interface
-	s := store.NewMemoryStore([]plants.Plant{})
-	srv := NewServer(logger, s)
-
 	cfg := config.NewDefaultServer()
 	// you could get some env vars here using `getenv`
 	// cfg.HOST = getenv("API_HOST")
 	// or parse args
 
+	// NOTE: realistically this wouldnt be an in-memory array,
+	// but a DB implementation of store.Store interface
+	s := store.NewMemoryStore([]plants.Plant{})
+
+	httpHandler := NewServer(logger, cfg, s)
 	httpServer := &http.Server{
 		Addr:    net.JoinHostPort(cfg.Host, cfg.Port),
-		Handler: srv,
+		Handler: httpHandler,
 	}
 
 	go func() {
@@ -68,8 +68,8 @@ func Run(
 	return nil
 }
 
-func addRoutes(mux *http.ServeMux, logger *slog.Logger, plantStore store.Store) {
-	root := "/api/v1"
+func addRoutes(mux *http.ServeMux, config config.Server, logger *slog.Logger, plantStore store.Store) {
+	root := config.RootPrefix
 
 	// NOTE: you can add specific middleware to each route here
 	adminOnly := newAdminOnlyMiddleware("supersecret")

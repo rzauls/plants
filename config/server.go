@@ -1,13 +1,15 @@
 package config
 
 type Server struct {
-	Host string
-	Port string
+	Host       string
+	Port       string
+	RootPrefix string
 }
 
 func NewDefaultServer() Server {
 	return Server{
-		Host: "localhost",
-		Port: "8080",
+		Host:       "localhost",
+		Port:       "8080",
+		RootPrefix: "/api/v1",
 	}
 }
