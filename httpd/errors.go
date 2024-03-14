@@ -9,3 +9,15 @@ func newHttpError(err error) httpError {
 		Message: err.Error(),
 	}
 }
+
+type validationError struct {
+	Message  string            `json:"message"`
+	Problems map[string]string `json:"errors,omitempty"`
+}
+
+func newValidationError(msg string, problems map[string]string) validationError {
+	return validationError{
+		Message:  msg,
+		Problems: problems,
+	}
+}

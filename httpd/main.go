@@ -1,112 +1,114 @@
 package httpd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
-
-	httpSwagger "github.com/swaggo/http-swagger/v2"
-
-	_ "plants/docs"
+	"plants/config"
 	"plants/plants"
 	"plants/store"
 )
 
-//	@title			Swagger Plant API
-//	@version		1.0
-//	@description	This is a sample server plant server with semi-auto generated swagger docs
+func NewServer(logger *slog.Logger, config config.Server, plantStore store.Store) http.Handler {
+	mux := http.NewServeMux()
+	addRoutes(mux, config, logger, plantStore)
+	// NOTE: handler doesnt care about what mux we use, so we define it as interface
+	var handler http.Handler = mux
 
-//	@contact.name	Rihards Zauls
-//	@contact.email	rihards.zauls@gmail.com
+	reqLoggerMiddleware := newLoggerMiddleware(logger)
+	// NOTE: youd add more middleware in the chain here
+	handler = reqLoggerMiddleware(handler)
 
-//	@license.name	Apache 2.0
-//	@license.url	http://www.apache.org/licenses/LICENSE-2.0.html
+	return handler
+}
 
-//	@host		localhost:8080
-//	@BasePath	/api/v1
+func Run(
+	ctx context.Context,
+	args []string,
+	getenv func(string) string,
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+) error {
+	logger := slog.New(slog.NewJSONHandler(stdout, nil))
+	slog.SetDefault(logger)
 
-//	@externalDocs.description	OpenAPI
-//	@externalDocs.url			https://swagger.io/resources/open-api/
-//
-// Run - runs the http daemon
-func Run() {
+	cfg := config.FromEnv(logger, getenv)
+
 	// NOTE: realistically this wouldnt be an in-memory array,
 	// but a DB implementation of store.Store interface
-
-	// TODO: add context for stopping everything
 	s := store.NewMemoryStore([]plants.Plant{})
-	logger := slog.Default()
 
-	service := newHttpService(s, logger)
-	host := "localhost:8080"
-
-	root := "/api/v1"
-	mux := http.NewServeMux()
-	// mux.handleFunc("/docs/swagger.json",
-	// http.Handle("/",
-	// http.FileServer(
-	//     http.File("../docs/swagger.json"),
-	// )
-	// )
-	mux.HandleFunc(http.MethodGet+" "+root+"/docs/*", httpSwagger.Handler(
-		httpSwagger.URL(host+"/docs/swagger.json"),
-	),
-	)
-	mux.HandleFunc(http.MethodGet+" "+root+"/plants/", service.handleListPlants)
-	mux.HandleFunc(http.MethodGet+" "+root+"/plants/{id}/", service.handleGetPlant)
-
-	logger.Info(fmt.Sprintf("Listening to requests on %s\n", host))
-
-	//set up middleware chain
-	chain := logRequestsMiddleware(mux)
-	http.ListenAndServe(host, chain)
-}
-
-// newHttpService - initializes a new httpService with its dependencies.
-// Passing nil as logger discards all logging messages (used for testing)
-func newHttpService(store store.Store, logger *slog.Logger) *httpService {
-	if logger == nil {
-		noopHandler := slog.NewJSONHandler(io.Discard, nil)
-		logger = slog.New(noopHandler)
+	httpHandler := NewServer(logger, cfg, s)
+	httpServer := &http.Server{
+		Addr:    net.JoinHostPort(cfg.Host, cfg.Port),
+		Handler: httpHandler,
 	}
 
-	return &httpService{
-		store:  store,
-		logger: logger,
+	go func() {
+		logger.Info(fmt.Sprintf("listening to requests on %s", string(httpServer.Addr)))
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error(fmt.Sprintf("error listening: %s", err))
+			return
+		}
+	}()
+
+	<-ctx.Done()
+	logger.Info("graceful shutdown")
+	if err := httpServer.Shutdown(ctx); err != nil {
+		logger.Error(fmt.Sprintf("error shutting down: %s", err))
 	}
+
+	return nil
 }
 
-type httpService struct {
-	store  store.Store
-	logger *slog.Logger
+func addRoutes(mux *http.ServeMux, config config.Server, logger *slog.Logger, plantStore store.Store) {
+	root := config.RootPrefix
+
+	// NOTE: you can add specific middleware to each route here
+	adminOnly := newAdminOnlyMiddleware("supersecret")
+
+	mux.Handle(http.MethodGet+" "+root+"/health", handleHealth())
+	mux.Handle(http.MethodGet+" "+root+"/plants/", handleListPlants(logger, plantStore))
+	mux.Handle(http.MethodPost+" "+root+"/plants/", adminOnly(handleCreatePlant(logger, plantStore)))
+	mux.Handle(http.MethodGet+" "+root+"/plants/{id}/", handleGetPlant(logger, plantStore))
 }
 
-func (s *httpService) response(w http.ResponseWriter, code int, payload any) {
+func encode[T any](w http.ResponseWriter, _ *http.Request, status int, v T) error {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	responseBytes, err := json.Marshal(payload)
-	if err != nil {
-		s.logger.Error(fmt.Errorf("marshal response payload: %w", err).Error())
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		return fmt.Errorf("encode json: %w", err)
 	}
-	w.Write(responseBytes)
+
+	return nil
 }
 
-func (s *httpService) responseError(w http.ResponseWriter, code int, err error) {
-	s.logger.Error(err.Error())
-	s.response(w, code, newHttpError(err))
+func decode[T any](r *http.Request) (T, error) {
+	var v T
+	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
+		return v, fmt.Errorf("decode json: %w", err)
+	}
 
+	return v, nil
 }
 
-func logRequestsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slog.Default().Info(fmt.Sprintf(
-			"%s %s",
-			r.Method,
-			r.URL.String(),
-		))
-		// NOTE: could wrap this with another writer so we can log the response code aswell, but since we log errors this isnt strictly useful
-		next.ServeHTTP(w, r)
-	})
+type Validator interface {
+	Valid() (problems map[string]string)
+}
+
+func decodeValid[T Validator](r *http.Request) (T, map[string]string, error) {
+	v, err := decode[T](r)
+	if err != nil {
+		return v, nil, err
+	}
+
+	if problems := v.Valid(); len(problems) > 0 {
+		return v, problems, fmt.Errorf("invalid input with %d error(-s)", len(problems))
+	}
+
+	return v, nil, nil
 }

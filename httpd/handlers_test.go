@@ -1,15 +1,17 @@
 package httpd
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"plants/plants"
 	"plants/store"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestListPlants(t *testing.T) {
@@ -49,13 +51,13 @@ func TestListPlants(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			// nil logger is noop
-			service := newHttpService(tc.store, nil)
 
-			request := httptest.NewRequest(http.MethodGet, "/", nil)
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
 			w := httptest.NewRecorder()
 
-			service.handleListPlants(w, request)
+			handler := handleListPlants(newNoopLogger(), tc.store)
+			handler.ServeHTTP(w, r)
+
 			res := w.Result()
 			defer res.Body.Close()
 
@@ -67,9 +69,8 @@ func TestListPlants(t *testing.T) {
 			if gotErr != nil {
 				t.Errorf("failed to read response body: %v", gotErr)
 			}
-			if string(gotBody) != tc.wantResponse {
-				t.Errorf(gotWantJson(string(gotBody), tc.wantResponse))
-			}
+
+			assert.JSONEq(t, tc.wantResponse, string(gotBody))
 		})
 	}
 }
@@ -118,16 +119,15 @@ func TestGetPlantByID(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			// nil logger is noop
-			service := newHttpService(tc.store, nil)
-
-			request := httptest.NewRequest(http.MethodGet, "/test", nil)
-			if tc.id != "" {
-				request.SetPathValue("id", tc.id)
-			}
+			r := httptest.NewRequest(http.MethodGet, "/test", nil)
 			w := httptest.NewRecorder()
 
-			service.handleGetPlant(w, request)
+			handler := handleGetPlant(newNoopLogger(), tc.store)
+			if tc.id != "" {
+				r.SetPathValue("id", tc.id)
+			}
+
+			handler.ServeHTTP(w, r)
 			res := w.Result()
 			defer res.Body.Close()
 
@@ -139,11 +139,79 @@ func TestGetPlantByID(t *testing.T) {
 			if gotErr != nil {
 				t.Errorf("failed to read response body: %v", gotErr)
 			}
-			if string(gotBody) != tc.wantResponse {
-				t.Errorf(gotWantJson(string(gotBody), tc.wantResponse))
-			}
+
+			assert.JSONEq(t, tc.wantResponse, string(gotBody))
 		})
 	}
+}
+
+func TestCreatePlant(t *testing.T) {
+	testError := errors.New("foo bar test error")
+
+	tests := map[string]struct {
+		store       store.Store
+		requestJson string
+
+		wantResponse string
+		wantCode     int
+	}{
+		"returns error when no data": {
+			store: &mockStore{},
+
+			wantResponse: `{"message":"validation error: decode json: EOF"}`,
+			wantCode:     http.StatusUnprocessableEntity,
+		},
+		"returns object json": {
+			store:       &mockStore{},
+			requestJson: `{"name":"foo","height":2}`,
+
+			wantResponse: `{"id":"new id","name":"foo","height":2}`,
+			wantCode:     http.StatusOK,
+		},
+		"returns validation errors": {
+			store:       &mockStore{},
+			requestJson: `{"name":"","height":-2}`,
+
+			// TODO: tests with long responses like these should be fuzzily matched, instead of comparing full JSON strings
+			wantResponse: `{"message":"validation error: invalid input with 2 error(-s)","errors":{"height":"height cannot be negative","name":"name cannot be empty"}}`,
+			wantCode:     http.StatusUnprocessableEntity,
+		},
+		"returns error when store error": {
+			store:       &mockStore{err: testError},
+			requestJson: `{"name":"foo","height":2}`,
+
+			wantResponse: `{"message":"create plant: foo bar test error"}`,
+			wantCode:     http.StatusInternalServerError,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "/test", strings.NewReader(tc.requestJson))
+			w := httptest.NewRecorder()
+
+			handler := handleCreatePlant(newNoopLogger(), tc.store)
+
+			handler.ServeHTTP(w, r)
+			res := w.Result()
+			defer res.Body.Close()
+
+			if res.StatusCode != tc.wantCode {
+				t.Errorf("status code mismatch, expected: %v, got: %v", tc.wantCode, res.StatusCode)
+			}
+
+			gotBody, gotErr := io.ReadAll(res.Body)
+			if gotErr != nil {
+				t.Errorf("failed to read response body: %v", gotErr)
+			}
+
+			assert.JSONEq(t, tc.wantResponse, string(gotBody))
+		})
+	}
+}
+
+func newNoopLogger() *slog.Logger {
+	return slog.New(slog.NewJSONHandler(io.Discard, nil))
 }
 
 type mockStore struct {
@@ -169,11 +237,10 @@ func (s *mockStore) Find(id string) (*plants.Plant, error) {
 	return s.plant, nil
 }
 
-// gotWantJson - formats json strings into somewhat more human-comparable look
-func gotWantJson(got any, want any) string {
-	spacing := "  "
-	gotJson, _ := json.MarshalIndent(got, "", spacing)
-	wantJson, _ := json.MarshalIndent(want, "", spacing)
-
-	return fmt.Sprintf("\ngot:\n%s\nwant:\n%s", string(gotJson), string(wantJson))
+func (s *mockStore) Create(plant plants.Plant) (*plants.Plant, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	plant.ID = "new id"
+	return &plant, nil
 }

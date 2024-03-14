@@ -3,6 +3,8 @@ package store
 import (
 	"fmt"
 	"plants/plants"
+
+	"github.com/google/uuid"
 )
 
 func NewMemoryStore(items []plants.Plant) *MemoryStore {
@@ -34,7 +36,14 @@ func (s *MemoryStore) List() ([]plants.Plant, error) {
 	return s.items, nil
 }
 
+func (s *MemoryStore) Create(plant plants.Plant) (*plants.Plant, error) {
+	plant.ID = uuid.New().String()
+	s.items = append(s.items, plant)
+	return &plant, nil
+}
+
 type Store interface {
 	Find(id string) (*plants.Plant, error)
 	List() ([]plants.Plant, error)
+	Create(plant plants.Plant) (*plants.Plant, error)
 }
