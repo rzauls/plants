@@ -1,24 +1,20 @@
 package httpd
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"plants/plants"
 	"plants/store"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestListPlants(t *testing.T) {
-	t.Skip()
 	testPlants := []plants.Plant{
 		{ID: "1", Name: "foo", Height: 4},
 		{ID: "2", Name: "bar", Height: 3},
@@ -55,13 +51,13 @@ func TestListPlants(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			// nil logger is noop
-			// server := NewServer(nil, tc.store)
 
-			// request := httptest.NewRequest(http.MethodGet, "/", nil)
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
 			w := httptest.NewRecorder()
 
-			// service.handleListPlants(w, request)
+			handler := handleListPlants(newNoopLogger(), tc.store)
+			handler.ServeHTTP(w, r)
+
 			res := w.Result()
 			defer res.Body.Close()
 
@@ -80,7 +76,6 @@ func TestListPlants(t *testing.T) {
 }
 
 func TestGetPlantByID(t *testing.T) {
-	t.Skip()
 	testPlant := plants.Plant{ID: "2", Name: "bar", Height: 3}
 	testError := errors.New("foo bar test error")
 
@@ -124,15 +119,15 @@ func TestGetPlantByID(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			// service := newHttpService(tc.store, nil)
-
-			request := httptest.NewRequest(http.MethodGet, "/test", nil)
-			if tc.id != "" {
-				request.SetPathValue("id", tc.id)
-			}
+			r := httptest.NewRequest(http.MethodGet, "/test", nil)
 			w := httptest.NewRecorder()
 
-			// service.handleGetPlant(w, request)
+			handler := handleGetPlant(newNoopLogger(), tc.store)
+			if tc.id != "" {
+				r.SetPathValue("id", tc.id)
+			}
+
+			handler.ServeHTTP(w, r)
 			res := w.Result()
 			defer res.Body.Close()
 
@@ -150,34 +145,73 @@ func TestGetPlantByID(t *testing.T) {
 	}
 }
 
-// TODO: write tests for create handler
-
 func TestCreatePlant(t *testing.T) {
-	t.Skip()
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	t.Cleanup(cancel)
-	go Run(ctx, []string{}, os.Getenv, os.Stdin, os.Stdout, os.Stderr)
+	testError := errors.New("foo bar test error")
 
-	plant := plants.Plant{ID: "foo", Name: "foo", Height: 5}
-	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(plant)
-	assert.NoError(t, err)
-	req, err := http.NewRequest(http.MethodPost, "/api/v1/plants", &buf)
-	assert.NoError(t, err)
+	tests := map[string]struct {
+		store       store.Store
+		requestJson string
 
-	client := http.Client{}
-	res, err := client.Do(req)
-	assert.NoError(t, err)
-	defer res.Body.Close()
+		wantResponse string
+		wantCode     int
+	}{
+		"returns error when no data": {
+			store: &mockStore{},
 
-	if res.StatusCode != http.StatusOK {
-		assert.Fail(t, "recieved non 200 response")
+			wantResponse: `{"message":"validation error: decode json: EOF"}`,
+			wantCode:     http.StatusUnprocessableEntity,
+		},
+		"returns object json": {
+			store:       &mockStore{},
+			requestJson: `{"name":"foo","height":2}`,
+
+			wantResponse: `{"id":"new id","name":"foo","height":2}`,
+			wantCode:     http.StatusOK,
+		},
+		"returns validation errors": {
+			store:       &mockStore{},
+			requestJson: `{"name":"","height":-2}`,
+
+			// TODO: tests with long responses like these should be fuzzily matched, instead of comparing full JSON strings
+			wantResponse: `{"message":"validation error: invalid input with 2 error(-s)","errors":{"height":"height cannot be negative","name":"name cannot be empty"}}`,
+			wantCode:     http.StatusUnprocessableEntity,
+		},
+		"returns error when store error": {
+			store:       &mockStore{err: testError},
+			requestJson: `{"name":"foo","height":2}`,
+
+			wantResponse: `{"message":"create plant: foo bar test error"}`,
+			wantCode:     http.StatusInternalServerError,
+		},
 	}
 
-	body, _ := io.ReadAll(res.Body)
-	fmt.Println(string(body))
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "/test", strings.NewReader(tc.requestJson))
+			w := httptest.NewRecorder()
 
+			handler := handleCreatePlant(newNoopLogger(), tc.store)
+
+			handler.ServeHTTP(w, r)
+			res := w.Result()
+			defer res.Body.Close()
+
+			if res.StatusCode != tc.wantCode {
+				t.Errorf("status code mismatch, expected: %v, got: %v", tc.wantCode, res.StatusCode)
+			}
+
+			gotBody, gotErr := io.ReadAll(res.Body)
+			if gotErr != nil {
+				t.Errorf("failed to read response body: %v", gotErr)
+			}
+
+			assert.JSONEq(t, tc.wantResponse, string(gotBody))
+		})
+	}
+}
+
+func newNoopLogger() *slog.Logger {
+	return slog.New(slog.NewJSONHandler(io.Discard, nil))
 }
 
 type mockStore struct {
@@ -204,6 +238,9 @@ func (s *mockStore) Find(id string) (*plants.Plant, error) {
 }
 
 func (s *mockStore) Create(plant plants.Plant) (*plants.Plant, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
 	plant.ID = "new id"
 	return &plant, nil
 }

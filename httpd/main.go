@@ -36,10 +36,7 @@ func Run(
 	logger := slog.New(slog.NewJSONHandler(stdout, nil))
 	slog.SetDefault(logger)
 
-	cfg := config.NewDefaultServer()
-	// you could get some env vars here using `getenv`
-	// cfg.HOST = getenv("API_HOST")
-	// or parse args
+	cfg := config.FromEnv(logger, getenv)
 
 	// NOTE: realistically this wouldnt be an in-memory array,
 	// but a DB implementation of store.Store interface
@@ -73,6 +70,8 @@ func addRoutes(mux *http.ServeMux, config config.Server, logger *slog.Logger, pl
 
 	// NOTE: you can add specific middleware to each route here
 	adminOnly := newAdminOnlyMiddleware("supersecret")
+
+	mux.Handle(http.MethodGet+" "+root+"/health", handleHealth())
 	mux.Handle(http.MethodGet+" "+root+"/plants/", handleListPlants(logger, plantStore))
 	mux.Handle(http.MethodPost+" "+root+"/plants/", adminOnly(handleCreatePlant(logger, plantStore)))
 	mux.Handle(http.MethodGet+" "+root+"/plants/{id}/", handleGetPlant(logger, plantStore))
@@ -108,7 +107,7 @@ func decodeValid[T Validator](r *http.Request) (T, map[string]string, error) {
 	}
 
 	if problems := v.Valid(); len(problems) > 0 {
-		return v, problems, fmt.Errorf("invalid %T: %d problems", v, len(problems))
+		return v, problems, fmt.Errorf("invalid input with %d error(-s)", len(problems))
 	}
 
 	return v, nil, nil

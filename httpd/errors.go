@@ -12,7 +12,7 @@ func newHttpError(err error) httpError {
 
 type validationError struct {
 	Message  string            `json:"message"`
-	Problems map[string]string `json:"errors"`
+	Problems map[string]string `json:"errors,omitempty"`
 }
 
 func newValidationError(msg string, problems map[string]string) validationError {

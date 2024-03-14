@@ -9,10 +9,9 @@ import (
 	"plants/store"
 )
 
-func handleHealth(logger *slog.Logger) http.Handler {
+func handleHealth() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO: check if all dependencies are accessible and ready for connections
-		encode(w, r, http.StatusOK, "ok")
+		encode(w, r, http.StatusOK, "")
 	})
 }
 
