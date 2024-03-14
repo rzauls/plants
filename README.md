@@ -8,6 +8,5 @@ There is a `Justfile` that contains a `nodemon` command for watching tests while
 
 To use it you need 2 applications:
 
-    - `just` a command runner with saner defaults than `make` <https://github.com/casey/just>
-
-    - `nodemon` a file watcher that runs a command after files get modified <https://nodemon.io/>
+- `just` a command runner with saner defaults than `make` <https://github.com/casey/just>
+- `nodemon` a file watcher that runs a command after files get modified <https://nodemon.io/>
