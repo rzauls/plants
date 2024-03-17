@@ -9,9 +9,12 @@ import (
 	"plants/store"
 )
 
+// TODO: This `encode` approach doesnt rly work well with error reporting
+// there probabbly is a nicer way to report json marshalling errors
+
 func handleHealth() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		encode(w, r, http.StatusOK, "")
+		_ = encode(w, r, http.StatusOK, "")
 	})
 }
 
@@ -21,7 +24,7 @@ func handleListPlants(logger *slog.Logger, plantStore store.Store) http.Handler 
 		if err != nil {
 			err = fmt.Errorf("retrieve all plants: %w", err)
 			logger.Error(err.Error())
-			encode(w, r, http.StatusInternalServerError, newHttpError(err))
+			_ = encode(w, r, http.StatusInternalServerError, newHttpError(err))
 			return
 		}
 
@@ -29,7 +32,7 @@ func handleListPlants(logger *slog.Logger, plantStore store.Store) http.Handler 
 			plts = make([]plants.Plant, 0)
 		}
 
-		encode(w, r, http.StatusOK, plts)
+		_ = encode(w, r, http.StatusOK, plts)
 	})
 }
 
@@ -39,7 +42,7 @@ func handleGetPlant(logger *slog.Logger, plantStore store.Store) http.Handler {
 		if id == "" {
 			err := errors.New("id is required in path parameters")
 			logger.Error(err.Error())
-			encode(w, r, http.StatusUnprocessableEntity, newHttpError(err))
+			_ = encode(w, r, http.StatusUnprocessableEntity, newHttpError(err))
 			return
 		}
 
@@ -47,18 +50,18 @@ func handleGetPlant(logger *slog.Logger, plantStore store.Store) http.Handler {
 		if err != nil {
 			err = fmt.Errorf("find plant by id: %w", err)
 			logger.Error(err.Error())
-			encode(w, r, http.StatusInternalServerError, newHttpError(err))
+			_ = encode(w, r, http.StatusInternalServerError, newHttpError(err))
 			return
 		}
 
 		if plant == nil {
 			err = fmt.Errorf("plant with ID '%s' does not exist", id)
 			logger.Error(err.Error())
-			encode(w, r, http.StatusNotFound, newHttpError(err))
+			_ = encode(w, r, http.StatusNotFound, newHttpError(err))
 			return
 		}
 
-		encode(w, r, http.StatusOK, plant)
+		_ = encode(w, r, http.StatusOK, plant)
 	})
 }
 
@@ -68,7 +71,7 @@ func handleCreatePlant(logger *slog.Logger, plantStore store.Store) http.Handler
 		if err != nil {
 			err = fmt.Errorf("validation error: %w", err)
 			logger.Error(err.Error())
-			encode(w, r, http.StatusUnprocessableEntity, newValidationError(err.Error(), problems))
+			_ = encode(w, r, http.StatusUnprocessableEntity, newValidationError(err.Error(), problems))
 			return
 		}
 
@@ -76,10 +79,10 @@ func handleCreatePlant(logger *slog.Logger, plantStore store.Store) http.Handler
 		if err != nil {
 			err = fmt.Errorf("create plant: %w", err)
 			logger.Error(err.Error())
-			encode(w, r, http.StatusInternalServerError, newHttpError(err))
+			_ = encode(w, r, http.StatusInternalServerError, newHttpError(err))
 			return
 		}
 
-		encode(w, r, http.StatusOK, plant)
+		_ = encode(w, r, http.StatusOK, plant)
 	})
 }
