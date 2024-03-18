@@ -7,6 +7,12 @@ import (
 	"github.com/google/uuid"
 )
 
+type Store interface {
+	Find(id string) (*plants.Plant, error)
+	List() ([]plants.Plant, error)
+	Create(plant plants.Plant) (*plants.Plant, error)
+}
+
 func NewMemoryStore(items []plants.Plant) *MemoryStore {
 	return &MemoryStore{
 		items: items,
@@ -40,10 +46,4 @@ func (s *MemoryStore) Create(plant plants.Plant) (*plants.Plant, error) {
 	plant.ID = uuid.New().String()
 	s.items = append(s.items, plant)
 	return &plant, nil
-}
-
-type Store interface {
-	Find(id string) (*plants.Plant, error)
-	List() ([]plants.Plant, error)
-	Create(plant plants.Plant) (*plants.Plant, error)
 }

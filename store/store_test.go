@@ -4,6 +4,8 @@ import (
 	"plants/plants"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMemoryStoreList(t *testing.T) {
@@ -92,6 +94,44 @@ func TestMemoryStoreFind(t *testing.T) {
 			if !reflect.DeepEqual(tc.want, got) {
 				t.Errorf("expected: %v, got: %v", tc.want, got)
 			}
+		})
+	}
+}
+
+func TestMemoryStoreCreate(t *testing.T) {
+	testPlant := plants.Plant{Name: "foo", Height: 1}
+
+	tests := map[string]struct {
+		store Store
+		plant plants.Plant
+
+		want *plants.Plant
+	}{
+		"creates an item": {
+			store: &MemoryStore{},
+			plant: testPlant,
+
+			want: &testPlant,
+		},
+		// NOTE: memoryStore.Create cannot fail so there is no error cases to test
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := tc.store.Create(tc.plant)
+			if err != nil {
+				t.Errorf("got error when didnt expect one: %v", err)
+			}
+
+			gotPlant, err := tc.store.Find(got.ID)
+			if err != nil {
+				t.Errorf("got error when didnt expect one while reading from store: %v", err)
+			}
+
+			assert.Equal(t, tc.want.Name, gotPlant.Name)
+			assert.Equal(t, tc.want.Name, gotPlant.Name)
+			// check if the ID is initialized after returning from store
+			assert.NotZero(t, gotPlant.ID)
 		})
 	}
 }
