@@ -38,7 +38,7 @@ func (s *MemoryStore) Find(ctx context.Context, id string) (*plants.Plant, error
 	// fancy slices index generic function
 	// index := slices.IndexFunc(s.items, func(p plants.Plant) bool { return p.ID == id })
 
-	logger := log.LogerFromCtx(ctx, slog.Default())
+	logger := log.LoggerFromCtx(ctx, slog.Default())
 	logger.Debug("some kind of debug message from store package", slog.Int("additionalField", 42))
 	for _, p := range s.items {
 		if p.ID == id {

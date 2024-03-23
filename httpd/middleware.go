@@ -45,7 +45,7 @@ func newLogger(logger *slog.Logger) func(next http.Handler) http.Handler {
 
 			next.ServeHTTP(wrapped, r)
 
-			requestLogger := log.LogerFromCtx(r.Context(), logger)
+			requestLogger := log.LoggerFromCtx(r.Context(), logger)
 			requestLogger.Info(
 				fmt.Sprintf("%s %s", r.Method, r.URL.String()),
 				slog.Int("statusCode", wrapped.statusCode),
