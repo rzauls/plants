@@ -16,14 +16,15 @@ import (
 func NewServer(logger *slog.Logger, config config.Server, plantStore store.Store) http.Handler {
 	mux := http.NewServeMux()
 	addRoutes(mux, config, logger, plantStore)
-	// NOTE: handler doesnt care about what mux we use, so we define it as interface
 	var handler http.Handler = mux
 
-	reqLoggerMiddleware := newLoggerMiddleware(logger)
-	// NOTE: youd add more middleware in the chain here
-	handler = reqLoggerMiddleware(handler)
+	stack := NewMiddlewareStack(
+		newLoggerMiddleware(logger),
+		newAdminOnlyMiddleware("authx"),
+		newTracingMiddleware(42),
+	)
 
-	return handler
+	return stack(handler)
 }
 
 func Run(
