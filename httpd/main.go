@@ -67,15 +67,15 @@ func Run(
 }
 
 func addRoutes(mux *http.ServeMux, config config.Server, logger *slog.Logger, plantStore store.Store) {
-	root := config.RootPrefix
+	rpg := routePathGenerator{root: config.RootPrefix}
 
 	// NOTE: you can add specific middleware to each route here
 	adminOnly := newAdminOnlyMiddleware("supersecret")
 
-	mux.Handle(http.MethodGet+" "+root+"/health", handleHealth())
-	mux.Handle(http.MethodGet+" "+root+"/plants/", handleListPlants(logger, plantStore))
-	mux.Handle(http.MethodPost+" "+root+"/plants/", adminOnly(handleCreatePlant(logger, plantStore)))
-	mux.Handle(http.MethodGet+" "+root+"/plants/{id}/", handleGetPlant(logger, plantStore))
+	mux.Handle(rpg.route(http.MethodGet, "/health"), handleHealth())
+	mux.Handle(rpg.route(http.MethodGet, "/plants/"), handleListPlants(logger, plantStore))
+	mux.Handle(rpg.route(http.MethodPost, "/plants/"), adminOnly(handleCreatePlant(logger, plantStore)))
+	mux.Handle(rpg.route(http.MethodGet, "/plants/{id}/"), handleGetPlant(logger, plantStore))
 }
 
 func encode[T any](w http.ResponseWriter, _ *http.Request, status int, v T) error {
