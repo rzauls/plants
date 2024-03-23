@@ -13,16 +13,25 @@ import (
 	"plants/store"
 )
 
-func NewServer(logger *slog.Logger, config config.Server, plantStore store.Store) http.Handler {
+func NewApiHandler(logger *slog.Logger, config config.Server, plantStore store.Store) http.Handler {
 	mux := http.NewServeMux()
-	addRoutes(mux, config, logger, plantStore)
-	var handler http.Handler = mux
 
-	stack := NewMiddlewareStack(
-		newLoggerMiddleware(logger),
-		newAdminOnlyMiddleware("authx"),
-		newTracingMiddleware(42),
+	// NOTE: you can add specific middleware to each route here
+	adminOnly := newAdminOnly("supersecret")
+
+	mux.Handle("GET /health", handleHealth())
+	mux.Handle("GET /plants/", handleListPlants(plantStore))
+	mux.Handle("POST /plants/", adminOnly(handleCreatePlant(plantStore)))
+	mux.Handle("GET /plants/{id}/", handleGetPlant(plantStore))
+
+	root := http.NewServeMux()
+	root.Handle("/api/v1/", http.StripPrefix("/api/v1", mux))
+
+	stack := newMiddlewareStack(
+		newTracing(logger),
+		newLogger(logger),
 	)
+	var handler http.Handler = root
 
 	return stack(handler)
 }
@@ -34,19 +43,21 @@ func Run(
 	stdin io.Reader,
 	stdout, stderr io.Writer,
 ) error {
-	logger := slog.New(slog.NewJSONHandler(stdout, nil))
+	// NOTE: you would configure the slog.Logger appropriately here, this is just for running locally,
+	// in a human-readable(-ish) form
+	logger := slog.New(slog.NewTextHandler(stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	slog.SetDefault(logger)
 
-	cfg := config.FromEnv(logger, getenv)
+	cfg := config.FromEnv(getenv)
 
 	// NOTE: realistically this wouldnt be an in-memory array,
 	// but a DB implementation of store.Store interface
 	s := store.NewMemoryStore([]plants.Plant{})
 
-	httpHandler := NewServer(logger, cfg, s)
+	handler := NewApiHandler(logger, cfg, s)
 	httpServer := &http.Server{
 		Addr:    net.JoinHostPort(cfg.Host, cfg.Port),
-		Handler: httpHandler,
+		Handler: handler,
 	}
 
 	go func() {
@@ -59,23 +70,11 @@ func Run(
 
 	<-ctx.Done()
 	logger.Info("graceful shutdown")
-	if err := httpServer.Shutdown(ctx); err != nil {
+	if err := httpServer.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
 		logger.Error(fmt.Sprintf("error shutting down: %s", err))
 	}
 
 	return nil
-}
-
-func addRoutes(mux *http.ServeMux, config config.Server, logger *slog.Logger, plantStore store.Store) {
-	rpg := routePathGenerator{root: config.RootPrefix}
-
-	// NOTE: you can add specific middleware to each route here
-	adminOnly := newAdminOnlyMiddleware("supersecret")
-
-	mux.Handle(rpg.route(http.MethodGet, "/health"), handleHealth())
-	mux.Handle(rpg.route(http.MethodGet, "/plants/"), handleListPlants(logger, plantStore))
-	mux.Handle(rpg.route(http.MethodPost, "/plants/"), adminOnly(handleCreatePlant(logger, plantStore)))
-	mux.Handle(rpg.route(http.MethodGet, "/plants/{id}/"), handleGetPlant(logger, plantStore))
 }
 
 func encode[T any](w http.ResponseWriter, _ *http.Request, status int, v T) error {

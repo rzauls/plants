@@ -18,8 +18,10 @@ func handleHealth() http.Handler {
 	})
 }
 
-func handleListPlants(logger *slog.Logger, plantStore store.Store) http.Handler {
+func handleListPlants(plantStore store.Store) http.Handler {
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger := logFromCtx(r.Context(), slog.Default())
 		plts, err := plantStore.List()
 		if err != nil {
 			err = fmt.Errorf("retrieve all plants: %w", err)
@@ -36,8 +38,9 @@ func handleListPlants(logger *slog.Logger, plantStore store.Store) http.Handler 
 	})
 }
 
-func handleGetPlant(logger *slog.Logger, plantStore store.Store) http.Handler {
+func handleGetPlant(plantStore store.Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger := logFromCtx(r.Context(), slog.Default())
 		id := r.PathValue("id")
 		if id == "" {
 			err := errors.New("id is required in path parameters")
@@ -48,16 +51,13 @@ func handleGetPlant(logger *slog.Logger, plantStore store.Store) http.Handler {
 
 		plant, err := plantStore.Find(id)
 		if err != nil {
+			code := http.StatusInternalServerError
+			if errors.As(err, &store.ErrorResourceDoesNotExist{}) {
+				code = http.StatusNotFound
+			}
 			err = fmt.Errorf("find plant by id: %w", err)
 			logger.Error(err.Error())
-			_ = encode(w, r, http.StatusInternalServerError, newHttpError(err))
-			return
-		}
-
-		if plant == nil {
-			err = fmt.Errorf("plant with ID '%s' does not exist", id)
-			logger.Error(err.Error())
-			_ = encode(w, r, http.StatusNotFound, newHttpError(err))
+			_ = encode(w, r, code, newHttpError(err))
 			return
 		}
 
@@ -65,8 +65,9 @@ func handleGetPlant(logger *slog.Logger, plantStore store.Store) http.Handler {
 	})
 }
 
-func handleCreatePlant(logger *slog.Logger, plantStore store.Store) http.Handler {
+func handleCreatePlant(plantStore store.Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logger := logFromCtx(r.Context(), slog.Default())
 		newPlant, problems, err := decodeValid[plants.Plant](r)
 		if err != nil {
 			err = fmt.Errorf("validation error: %w", err)

@@ -15,6 +15,7 @@ import (
 )
 
 func TestListPlants(t *testing.T) {
+	slog.SetDefault(newNoopLogger())
 	testPlants := []plants.Plant{
 		{ID: "1", Name: "foo", Height: 4},
 		{ID: "2", Name: "bar", Height: 3},
@@ -55,7 +56,7 @@ func TestListPlants(t *testing.T) {
 			r := httptest.NewRequest(http.MethodGet, "/", nil)
 			w := httptest.NewRecorder()
 
-			handler := handleListPlants(newNoopLogger(), tc.store)
+			handler := handleListPlants(tc.store)
 			handler.ServeHTTP(w, r)
 
 			res := w.Result()
@@ -76,6 +77,7 @@ func TestListPlants(t *testing.T) {
 }
 
 func TestGetPlantByID(t *testing.T) {
+	slog.SetDefault(newNoopLogger())
 	testPlant := plants.Plant{ID: "2", Name: "bar", Height: 3}
 	testError := errors.New("foo bar test error")
 
@@ -90,7 +92,7 @@ func TestGetPlantByID(t *testing.T) {
 			store: &mockStore{},
 			id:    "123",
 
-			wantResponse: `{"message":"plant with ID '123' does not exist"}`,
+			wantResponse: `{"message":"find plant by id: item doesnt exist in store"}`,
 			wantCode:     http.StatusNotFound,
 		},
 		"returns object json": {
@@ -122,7 +124,7 @@ func TestGetPlantByID(t *testing.T) {
 			r := httptest.NewRequest(http.MethodGet, "/test", nil)
 			w := httptest.NewRecorder()
 
-			handler := handleGetPlant(newNoopLogger(), tc.store)
+			handler := handleGetPlant(tc.store)
 			if tc.id != "" {
 				r.SetPathValue("id", tc.id)
 			}
@@ -146,6 +148,7 @@ func TestGetPlantByID(t *testing.T) {
 }
 
 func TestCreatePlant(t *testing.T) {
+	slog.SetDefault(newNoopLogger())
 	testError := errors.New("foo bar test error")
 
 	tests := map[string]struct {
@@ -190,7 +193,7 @@ func TestCreatePlant(t *testing.T) {
 			r := httptest.NewRequest(http.MethodGet, "/test", strings.NewReader(tc.requestJson))
 			w := httptest.NewRecorder()
 
-			handler := handleCreatePlant(newNoopLogger(), tc.store)
+			handler := handleCreatePlant(tc.store)
 
 			handler.ServeHTTP(w, r)
 			res := w.Result()
@@ -233,6 +236,9 @@ func (s *mockStore) Find(id string) (*plants.Plant, error) {
 	}
 	if s.err != nil {
 		return nil, s.err
+	}
+	if s.plant == nil {
+		return nil, store.ErrorResourceDoesNotExist{Err: errors.New("item doesnt exist in store")}
 	}
 	return s.plant, nil
 }

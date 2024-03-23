@@ -23,6 +23,14 @@ type MemoryStore struct {
 	items []plants.Plant
 }
 
+type ErrorResourceDoesNotExist struct {
+	Err error
+}
+
+func (e ErrorResourceDoesNotExist) Error() string {
+	return e.Err.Error()
+}
+
 func (s *MemoryStore) Find(id string) (*plants.Plant, error) {
 	// fancy slices index generic function
 	// index := slices.IndexFunc(s.items, func(p plants.Plant) bool { return p.ID == id })
@@ -35,7 +43,7 @@ func (s *MemoryStore) Find(id string) (*plants.Plant, error) {
 	}
 
 	// NOTE: realistically there would be more than 1 way of this find failing, so we could return typed errors and handle them in different ways
-	return nil, fmt.Errorf("plant with ID '%s' does not exist", id)
+	return nil, ErrorResourceDoesNotExist{Err: fmt.Errorf("plant with ID '%s' does not exist", id)}
 }
 
 func (s *MemoryStore) List() ([]plants.Plant, error) {
