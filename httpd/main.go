@@ -45,7 +45,7 @@ func Run(
 ) error {
 	// NOTE: you would configure the slog.Logger appropriately here, this is just for running locally,
 	// in a human-readable(-ish) form
-	logger := slog.New(slog.NewTextHandler(stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	logger := slog.New(slog.NewTextHandler(stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	slog.SetDefault(logger)
 
 	cfg := config.FromEnv(getenv)
