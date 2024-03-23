@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"plants/log"
 	"time"
 
 	"github.com/rs/xid"
@@ -33,14 +34,6 @@ func (w *wrappedWriter) WriteHeader(statusCode int) {
 	w.statusCode = statusCode
 }
 
-func logFromCtx(ctx context.Context, fallback *slog.Logger) *slog.Logger {
-	requestLogger, ok := ctx.Value(CONTEXT_LOGGER).(*slog.Logger)
-	if !ok {
-		requestLogger = fallback
-	}
-	return requestLogger
-}
-
 func newLogger(logger *slog.Logger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -52,7 +45,7 @@ func newLogger(logger *slog.Logger) func(next http.Handler) http.Handler {
 
 			next.ServeHTTP(wrapped, r)
 
-			requestLogger := logFromCtx(r.Context(), logger)
+			requestLogger := log.LogerFromCtx(r.Context(), logger)
 			requestLogger.Info(
 				fmt.Sprintf("%s %s", r.Method, r.URL.String()),
 				slog.Int("statusCode", wrapped.statusCode),
@@ -74,10 +67,8 @@ func newAdminOnly(authHandler string) func(next http.Handler) http.Handler {
 
 // NOTE: use typed strings for context keys so they cannot collide on accident,
 // however in this case we are using constants as keys so that wouldnt be possible anyway
-type loggerCtxKey string
 type traceCtxKey string
 
-const CONTEXT_LOGGER loggerCtxKey = "ctx.logger"
 const CONTEXT_TRACE_ID traceCtxKey = "ctx.trace"
 
 func newTracing(logger *slog.Logger) func(next http.Handler) http.Handler {
@@ -89,7 +80,7 @@ func newTracing(logger *slog.Logger) func(next http.Handler) http.Handler {
 
 			// add request ID to all child logs
 			scopedLogger := logger.With(slog.String("traceId", requestID))
-			ctx = context.WithValue(ctx, CONTEXT_LOGGER, scopedLogger)
+			ctx = context.WithValue(ctx, log.CONTEXT_LOGGER, scopedLogger)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

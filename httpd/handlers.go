@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"plants/log"
 	"plants/plants"
 	"plants/store"
 )
@@ -19,10 +20,10 @@ func handleHealth() http.Handler {
 }
 
 func handleListPlants(plantStore store.Store) http.Handler {
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger := logFromCtx(r.Context(), slog.Default())
-		plts, err := plantStore.List()
+		ctx := r.Context()
+		logger := log.LogerFromCtx(ctx, slog.Default())
+		plts, err := plantStore.List(ctx)
 		if err != nil {
 			err = fmt.Errorf("retrieve all plants: %w", err)
 			logger.Error(err.Error())
@@ -40,7 +41,8 @@ func handleListPlants(plantStore store.Store) http.Handler {
 
 func handleGetPlant(plantStore store.Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger := logFromCtx(r.Context(), slog.Default())
+		ctx := r.Context()
+		logger := log.LogerFromCtx(ctx, slog.Default())
 		id := r.PathValue("id")
 		if id == "" {
 			err := errors.New("id is required in path parameters")
@@ -49,7 +51,7 @@ func handleGetPlant(plantStore store.Store) http.Handler {
 			return
 		}
 
-		plant, err := plantStore.Find(id)
+		plant, err := plantStore.Find(ctx, id)
 		if err != nil {
 			code := http.StatusInternalServerError
 			if errors.As(err, &store.ErrorResourceDoesNotExist{}) {
@@ -67,7 +69,8 @@ func handleGetPlant(plantStore store.Store) http.Handler {
 
 func handleCreatePlant(plantStore store.Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger := logFromCtx(r.Context(), slog.Default())
+		ctx := r.Context()
+		logger := log.LogerFromCtx(ctx, slog.Default())
 		newPlant, problems, err := decodeValid[plants.Plant](r)
 		if err != nil {
 			err = fmt.Errorf("validation error: %w", err)
@@ -76,7 +79,7 @@ func handleCreatePlant(plantStore store.Store) http.Handler {
 			return
 		}
 
-		plant, err := plantStore.Create(newPlant)
+		plant, err := plantStore.Create(ctx, newPlant)
 		if err != nil {
 			err = fmt.Errorf("create plant: %w", err)
 			logger.Error(err.Error())

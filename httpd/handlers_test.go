@@ -1,6 +1,7 @@
 package httpd
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -223,14 +224,14 @@ type mockStore struct {
 	err    error
 }
 
-func (s *mockStore) List() ([]plants.Plant, error) {
+func (s *mockStore) List(_ context.Context) ([]plants.Plant, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
 	return s.plants, nil
 }
 
-func (s *mockStore) Find(id string) (*plants.Plant, error) {
+func (s *mockStore) Find(_ context.Context, id string) (*plants.Plant, error) {
 	if id == "" {
 		return nil, errors.New("invalid id")
 	}
@@ -243,7 +244,7 @@ func (s *mockStore) Find(id string) (*plants.Plant, error) {
 	return s.plant, nil
 }
 
-func (s *mockStore) Create(plant plants.Plant) (*plants.Plant, error) {
+func (s *mockStore) Create(_ context.Context, plant plants.Plant) (*plants.Plant, error) {
 	if s.err != nil {
 		return nil, s.err
 	}

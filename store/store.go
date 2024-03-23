@@ -1,16 +1,19 @@
 package store
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
+	"plants/log"
 	"plants/plants"
 
 	"github.com/google/uuid"
 )
 
 type Store interface {
-	Find(id string) (*plants.Plant, error)
-	List() ([]plants.Plant, error)
-	Create(plant plants.Plant) (*plants.Plant, error)
+	Find(ctx context.Context, id string) (*plants.Plant, error)
+	List(ctx context.Context) ([]plants.Plant, error)
+	Create(ctx context.Context, plant plants.Plant) (*plants.Plant, error)
 }
 
 func NewMemoryStore(items []plants.Plant) *MemoryStore {
@@ -31,10 +34,12 @@ func (e ErrorResourceDoesNotExist) Error() string {
 	return e.Err.Error()
 }
 
-func (s *MemoryStore) Find(id string) (*plants.Plant, error) {
+func (s *MemoryStore) Find(ctx context.Context, id string) (*plants.Plant, error) {
 	// fancy slices index generic function
 	// index := slices.IndexFunc(s.items, func(p plants.Plant) bool { return p.ID == id })
 
+	logger := log.LogerFromCtx(ctx, slog.Default())
+	logger.Debug("some kind of debug message from store package", slog.Int("additionalField", 42))
 	for _, p := range s.items {
 		if p.ID == id {
 			return &p, nil
@@ -46,11 +51,11 @@ func (s *MemoryStore) Find(id string) (*plants.Plant, error) {
 	return nil, ErrorResourceDoesNotExist{Err: fmt.Errorf("plant with ID '%s' does not exist", id)}
 }
 
-func (s *MemoryStore) List() ([]plants.Plant, error) {
+func (s *MemoryStore) List(ctx context.Context) ([]plants.Plant, error) {
 	return s.items, nil
 }
 
-func (s *MemoryStore) Create(plant plants.Plant) (*plants.Plant, error) {
+func (s *MemoryStore) Create(ctx context.Context, plant plants.Plant) (*plants.Plant, error) {
 	plant.ID = uuid.New().String()
 	s.items = append(s.items, plant)
 	return &plant, nil

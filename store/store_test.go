@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"plants/plants"
 	"reflect"
 	"testing"
@@ -9,6 +10,7 @@ import (
 )
 
 func TestMemoryStoreList(t *testing.T) {
+	ctx := context.Background()
 	testPlants := []plants.Plant{
 		{ID: "1", Name: "foo", Height: 4},
 		{ID: "2", Name: "bar", Height: 3},
@@ -39,7 +41,7 @@ func TestMemoryStoreList(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, gotErr := tc.store.List()
+			got, gotErr := tc.store.List(ctx)
 			if gotErr != nil && tc.wantErr != nil {
 				t.Fatalf("unexpected branch, no errors should occur in this test: %v", gotErr)
 			}
@@ -54,6 +56,7 @@ func TestMemoryStoreList(t *testing.T) {
 }
 
 func TestMemoryStoreFind(t *testing.T) {
+	ctx := context.Background()
 	testPlant := plants.Plant{ID: "2", Name: "bar", Height: 3}
 	testPlants := []plants.Plant{
 		{ID: "1", Name: "foo", Height: 4},
@@ -86,7 +89,7 @@ func TestMemoryStoreFind(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, gotErr := tc.store.Find(tc.id)
+			got, gotErr := tc.store.Find(ctx, tc.id)
 			if gotErr != nil && !tc.wantErr {
 				t.Errorf("got error when didnt expect one: %v", gotErr)
 			}
@@ -99,6 +102,7 @@ func TestMemoryStoreFind(t *testing.T) {
 }
 
 func TestMemoryStoreCreate(t *testing.T) {
+	ctx := context.Background()
 	testPlant := plants.Plant{Name: "foo", Height: 1}
 
 	tests := map[string]struct {
@@ -118,12 +122,12 @@ func TestMemoryStoreCreate(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, err := tc.store.Create(tc.plant)
+			got, err := tc.store.Create(ctx, tc.plant)
 			if err != nil {
 				t.Errorf("got error when didnt expect one: %v", err)
 			}
 
-			gotPlant, err := tc.store.Find(got.ID)
+			gotPlant, err := tc.store.Find(ctx, got.ID)
 			if err != nil {
 				t.Errorf("got error when didnt expect one while reading from store: %v", err)
 			}
