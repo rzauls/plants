@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"log/slog"
+	"plants/log"
 	"plants/plants"
 	"reflect"
 	"testing"
@@ -10,6 +12,7 @@ import (
 )
 
 func TestMemoryStoreList(t *testing.T) {
+	slog.SetDefault(log.NoopLogger())
 	ctx := context.Background()
 	testPlants := []plants.Plant{
 		{ID: "1", Name: "foo", Height: 4},
@@ -56,6 +59,7 @@ func TestMemoryStoreList(t *testing.T) {
 }
 
 func TestMemoryStoreFind(t *testing.T) {
+	slog.SetDefault(log.NoopLogger())
 	ctx := context.Background()
 	testPlant := plants.Plant{ID: "2", Name: "bar", Height: 3}
 	testPlants := []plants.Plant{
@@ -102,6 +106,7 @@ func TestMemoryStoreFind(t *testing.T) {
 }
 
 func TestMemoryStoreCreate(t *testing.T) {
+	slog.SetDefault(log.NoopLogger())
 	ctx := context.Background()
 	testPlant := plants.Plant{Name: "foo", Height: 1}
 

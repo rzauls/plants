@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"plants/log"
 	"plants/plants"
 	"plants/store"
 	"strings"
@@ -16,7 +17,7 @@ import (
 )
 
 func TestListPlants(t *testing.T) {
-	slog.SetDefault(newNoopLogger())
+	slog.SetDefault(log.NoopLogger())
 	testPlants := []plants.Plant{
 		{ID: "1", Name: "foo", Height: 4},
 		{ID: "2", Name: "bar", Height: 3},
@@ -78,7 +79,7 @@ func TestListPlants(t *testing.T) {
 }
 
 func TestGetPlantByID(t *testing.T) {
-	slog.SetDefault(newNoopLogger())
+	slog.SetDefault(log.NoopLogger())
 	testPlant := plants.Plant{ID: "2", Name: "bar", Height: 3}
 	testError := errors.New("foo bar test error")
 
@@ -149,7 +150,7 @@ func TestGetPlantByID(t *testing.T) {
 }
 
 func TestCreatePlant(t *testing.T) {
-	slog.SetDefault(newNoopLogger())
+	slog.SetDefault(log.NoopLogger())
 	testError := errors.New("foo bar test error")
 
 	tests := map[string]struct {
@@ -212,10 +213,6 @@ func TestCreatePlant(t *testing.T) {
 			assert.JSONEq(t, tc.wantResponse, string(gotBody))
 		})
 	}
-}
-
-func newNoopLogger() *slog.Logger {
-	return slog.New(slog.NewJSONHandler(io.Discard, nil))
 }
 
 type mockStore struct {

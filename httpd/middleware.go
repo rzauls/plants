@@ -35,6 +35,7 @@ func (w *wrappedWriter) WriteHeader(statusCode int) {
 }
 
 func newLogger(logger *slog.Logger) func(next http.Handler) http.Handler {
+	slog.SetDefault(logger)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
@@ -45,7 +46,7 @@ func newLogger(logger *slog.Logger) func(next http.Handler) http.Handler {
 
 			next.ServeHTTP(wrapped, r)
 
-			requestLogger := log.LoggerFromCtx(r.Context(), logger)
+			requestLogger := log.LoggerFromCtx(r.Context())
 			requestLogger.Info(
 				fmt.Sprintf("%s %s", r.Method, r.URL.String()),
 				slog.Int("statusCode", wrapped.statusCode),
@@ -55,7 +56,7 @@ func newLogger(logger *slog.Logger) func(next http.Handler) http.Handler {
 	}
 }
 
-func newAdminOnly(authHandler string) func(next http.Handler) http.Handler {
+func newAdminOnly(_ string) func(next http.Handler) http.Handler {
 	// NOTE: this doesnt actually do anything, its just an example of how a middleware would get its dependencies
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

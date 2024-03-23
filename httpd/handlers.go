@@ -3,7 +3,6 @@ package httpd
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"plants/log"
 	"plants/plants"
@@ -22,7 +21,7 @@ func handleHealth() http.Handler {
 func handleListPlants(plantStore store.Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		logger := log.LoggerFromCtx(ctx, slog.Default())
+		logger := log.LoggerFromCtx(ctx)
 		plts, err := plantStore.List(ctx)
 		if err != nil {
 			err = fmt.Errorf("retrieve all plants: %w", err)
@@ -42,7 +41,7 @@ func handleListPlants(plantStore store.Store) http.Handler {
 func handleGetPlant(plantStore store.Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		logger := log.LoggerFromCtx(ctx, slog.Default())
+		logger := log.LoggerFromCtx(ctx)
 		id := r.PathValue("id")
 		if id == "" {
 			err := errors.New("id is required in path parameters")
@@ -70,7 +69,7 @@ func handleGetPlant(plantStore store.Store) http.Handler {
 func handleCreatePlant(plantStore store.Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		logger := log.LoggerFromCtx(ctx, slog.Default())
+		logger := log.LoggerFromCtx(ctx)
 		newPlant, problems, err := decodeValid[plants.Plant](r)
 		if err != nil {
 			err = fmt.Errorf("validation error: %w", err)
