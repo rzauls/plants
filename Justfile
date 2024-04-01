@@ -1,2 +1,2 @@
 watch-tests:
-	nodemon --exec "go test ./... -v" --signal SIGTERM -e go
+	nodemon --exec "go test ./..." --signal SIGTERM -e go
