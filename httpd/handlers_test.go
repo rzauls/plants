@@ -62,7 +62,7 @@ func TestListPlants(t *testing.T) {
 			handler.ServeHTTP(w, r)
 
 			res := w.Result()
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 
 			if res.StatusCode != tc.wantCode {
 				t.Errorf("status code mismatch, expected: %v, got: %v", tc.wantCode, res.StatusCode)
@@ -133,7 +133,7 @@ func TestGetPlantByID(t *testing.T) {
 
 			handler.ServeHTTP(w, r)
 			res := w.Result()
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 
 			if res.StatusCode != tc.wantCode {
 				t.Errorf("status code mismatch, expected: %v, got: %v", tc.wantCode, res.StatusCode)
@@ -199,7 +199,7 @@ func TestCreatePlant(t *testing.T) {
 
 			handler.ServeHTTP(w, r)
 			res := w.Result()
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 
 			if res.StatusCode != tc.wantCode {
 				t.Errorf("status code mismatch, expected: %v, got: %v", tc.wantCode, res.StatusCode)
