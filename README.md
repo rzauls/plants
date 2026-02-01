@@ -1,4 +1,7 @@
+
 # Plants API
+
+NOTE: I no longer am interested in "maintaining" this, so ive archived the repo.
 
 Generic-ish http API, originally to test `swaggo/swag` openAPI spec generation, but eventually refactored into a testpiece 
 for checking out the new `http.ServeMux` router and `slog` package from std lib.
